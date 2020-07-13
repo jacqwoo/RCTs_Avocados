@@ -1,0 +1,134 @@
+# -----------------------------------------------------------------------------
+# Title: Determining the Most Effective Method of Avocado Storage
+# Author: Jacqueline Woo, jacqwoo@gmail.com
+# Date: 3/25/2019
+# R Version: 3.6.3
+# RStudio Version: 1.2.5033
+# -----------------------------------------------------------------------------
+
+rm(list=ls())       # clear objects in memory
+set.seed(220288)   # random number seed, so that results are reproducible
+library(foreign)    # package allows R to read Stata datasets
+library(dplyr)
+library(ri)
+library(randomizr)
+
+setwd("C:/Users/jacqw/Documents/Columbia/Spring 2019/POS 4768 Experiments/Practicum")
+results <- read.csv("results-final.csv")
+names(results) <- c("containers","treat","loc","tt","Greasiness","Sliminess","Smell","Taste","Color")
+
+#Distribution of Individual Outcomes
+##Greasiness
+par(mfrow=c(1,5))
+hist(results[results$treat=="T1",]$Greasiness,main="Oil Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T2",]$Greasiness,main="Water Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T3",]$Greasiness,main="Onion Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T4",]$Greasiness,main="Control",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+
+##Sliminess
+par(mfrow=c(1,5))
+hist(results[results$treat=="T1",]$Sliminess,main="Oil Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T2",]$Sliminess,main="Water Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T3",]$Sliminess,main="Onion Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T4",]$Sliminess,main="Control",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+
+##Smell
+par(mfrow=c(1,5))
+hist(results[results$treat=="T1",]$Smell,main="Oil Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T2",]$Smell,main="Water Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T3",]$Smell,main="Onion Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T4",]$Smell,main="Control",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+
+##Taste
+par(mfrow=c(1,5))
+hist(results[results$treat=="T1",]$Taste,main="Oil Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T2",]$Taste,main="Water Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T3",]$Taste,main="Onion Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T4",]$Taste,main="Control",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+
+##Color
+par(mfrow=c(1,5))
+hist(results[results$treat=="T1",]$Color,main="Oil Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T2",]$Color,main="Water Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T3",]$Color,main="Onion Treatment",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+hist(results[results$treat=="T4",]$Color,main="Control",ylim=c(0,6),xlim=c(0,5),
+     xlab="")
+
+results <- within(results, treat <- relevel(treat, ref = "T4"))
+results <- results %>% mutate(treat_all=ifelse(treat=="T4",0,1))
+
+#ATE, SE, CI, RI test
+results <- results %>% mutate(treat_x=ifelse(treat=="T1",1,
+                                      ifelse(treat=="T2",2,
+                                      ifelse(treat=="T3",3,4))))
+
+# RI
+##Individual Treatment
+Treatment <- 3 ###change this for every treatment
+Variable <- 'Taste' ###change this for every outcome variable
+X <- results %>% select(treat_x) %>% filter (treat_x==Treatment|treat_x==4) %>% mutate(treat=ifelse(treat_x==Treatment,1,0))%>%select(treat)
+Z <- X[,1]
+W <- results %>% filter (treat_x==Treatment|treat_x==4) %>% select(Variable)
+Y <- W[,1]
+
+prob <- genprobexact(Z)
+ate <- estate(Y,Z,prob=prob)
+
+### CIs
+
+perms <- genperms(Z=Z, maxiter = 1000)
+
+Ys.est <- genouts(Y,Z,ate)
+estdist <- gendist(Ys.est,perms,prob=prob,HT=FALSE)
+dispdist(estdist,ate)
+mean(estdist)
+ate
+
+### test sharp null
+Ys.est <- genouts(Y,Z,ate=0)
+estdist <- gendist(Ys.est,perms,prob=prob,HT=FALSE)
+dispdist(estdist,ate,display.plot=TRUE)
+
+#RI for all treatments
+Variable <- 'Taste' ###change this for every outcome variable
+X_all <- results %>% select(treat_x) %>% mutate(treat=ifelse(treat_x==4,0,1))%>%select(treat)
+Z_all <- X_all[,1]
+W_all <- results %>% select(Variable)
+Y_all <- W_all[,1]
+
+prob_all <- genprobexact(Z_all)
+ate_all <- estate(Y_all,Z_all,prob=prob_all)
+
+### CIs
+
+perms_all <- genperms(Z=Z_all, maxiter = 1000)
+
+Ys.est_all <- genouts(Y_all,Z_all,ate_all)
+estdist_all <- gendist(Ys.est_all,perms_all,prob=prob_all,HT=FALSE)
+dispdist(estdist_all,ate_all)
+mean(estdist_all)
+ate_all
+
+### test sharp null
+Ys.est_all <- genouts(Y_all,Z_all,ate=0)
+estdist_all <- gendist(Ys.est_all,perms_all,prob=prob_all,HT=FALSE)
+dispdist(estdist_all,ate_all,display.plot=TRUE)
